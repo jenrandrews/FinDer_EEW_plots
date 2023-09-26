@@ -33,18 +33,49 @@ def setBasemap(bounds = None):
     gl.right_labels = False
     return fig, ax, ccrs.PlateCarree()
 
-def plotMaps(evid, mmi_tw, alert_cats, alerts, obs):
+def plotObsMaps(evid, obs, zoom=False):
+    '''
+    Plot observation maps
+    '''
+    if zoom:
+        # Zoom map to event
+        import eew_utils as utils
+        client = utils.getClient()
+        ev = utils.getEvent(client, evid)
+        evlat = ev.preferred_origin().latitude
+        evlon = ev.preferred_origin().longitude
+        evbounds = [evlon-1., evlon+1., evlat-1., evlat+1.]
+    if zoom:
+        fig, ax, proj = setBasemap(bounds=evbounds)
+    else:
+        fig, ax, proj = setBasemap()
+    ax.add_feature(cartopy.feature.OCEAN, zorder=2, facecolor='white', edgecolor='grey', lw=0.5)
+    ax.set_title(f'Observed MMI')
+    cb = ax.scatter([obs[x]['location']['lon'] for x in obs], 
+            [obs[x]['location']['lat'] for x in obs], 
+            c=[obs[x]['max'] for x in obs], 
+            transform=proj, cmap='jet', lw=0.5, edgecolor='k', zorder=3)
+    cbar = fig.colorbar(cb, ax=ax)
+    cbar.set_label('observed MMI')
+    if zoom:
+        fig.savefig(os.path.join(evid, f'{evid}_map-obs-zoom.png'))
+    else:
+        fig.savefig(os.path.join(evid, f'{evid}_map-obs.png'))
+    plt.close()
+    return
+
+def plotMaps(evid, mmi_tw, alert_cats, alerts, obs, zoom=False):
     '''
     Plot alert maps
     '''
-    ### tmp event
-    import eew_utils as utils
-    client = utils.getClient()
-    ev = utils.getEvent(client, evid)
-    evlat = ev.preferred_origin().latitude
-    evlon = ev.preferred_origin().longitude
-    evbounds = [evlon-1., evlon+1., evlat-1., evlat+1.]
-    ### tmp event
+    if zoom:
+        # Zoom map to event
+        import eew_utils as utils
+        client = utils.getClient()
+        ev = utils.getEvent(client, evid)
+        evlat = ev.preferred_origin().latitude
+        evlon = ev.preferred_origin().longitude
+        evbounds = [evlon-1., evlon+1., evlat-1., evlat+1.]
 
     # Plot categories map
     win = cm.winter
@@ -52,8 +83,10 @@ def plotMaps(evid, mmi_tw, alert_cats, alerts, obs):
     win.set_under('b')
     win.set_bad('b')
     for mmi_a in alert_cats:
-#        fig, ax, proj = setBasemap(bounds=evbounds)
-        fig, ax, proj = setBasemap()
+        if zoom:
+            fig, ax, proj = setBasemap(bounds=evbounds)
+        else:
+            fig, ax, proj = setBasemap()
         ax.add_feature(cartopy.feature.OCEAN, zorder=2, facecolor='white', edgecolor='grey', lw=0.5)
         ax.set_title(f'MMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
         cb = ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPT']], 
@@ -79,8 +112,10 @@ def plotMaps(evid, mmi_tw, alert_cats, alerts, obs):
         fig.legend(loc='upper left')
         cbar = fig.colorbar(cb, ax=ax)
         cbar.set_label('warning time (s)')
-#        fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map-zoom.png'))
-        fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map.png'))
+        if zoom:
+            fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map-zoom.png'))
+        else:
+            fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map.png'))
     plt.close()
     return
 
@@ -259,8 +294,11 @@ if __name__ == '__main__':
         exit()
 
     obs = rdExceedanceTbl(ofname)
+    plotObsMaps(evid, obs)
+    plotObsMaps(evid, obs, zoom=True)
     alerts = rdAlertTbl(afname)
     alert_cats = sortCategories(evid, obs, alerts, mmi_tw)
     plotMaps(evid, mmi_tw, alert_cats, alerts, obs)
-    #plotScatter(evid, mmi_tw, alert_cats, alerts, obs)
-    #plotCDF(evid, mmi_tw, alert_cats, alerts, obs)
+    plotMaps(evid, mmi_tw, alert_cats, alerts, obs, zoom=True)
+    plotScatter(evid, mmi_tw, alert_cats, alerts, obs)
+    plotCDF(evid, mmi_tw, alert_cats, alerts, obs)

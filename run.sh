@@ -42,11 +42,11 @@ mmi_tw=5.0 # MMI threshold for warning times and shaking of interest (not alert 
 # ms2mmi will: 
 # # download event, inventory and miniseed based on a GeoNet eventID
 # # compute the exceedence times for mmis in range 2.5 -> 8.5 stepping every 0.5 based on miniseed PGA & PGV (median MMI)
-#python ms2mmi.py $evid 
+python ms2mmi.py $evid 
 
 # alert_times.py will:
 # # download event
 # # read alert_distances.tbl ---> mag + mmi -> dist tbl created for GMPE + GMICE (see openquake scripts)
-#python alert_times.py $evid $fd_evid $fd_auth $alert_method
+python alert_times.py $evid $fd_evid $fd_auth $alert_method
 
 python plots.py $evid $mmi_tw
