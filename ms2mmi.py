@@ -82,7 +82,14 @@ def ms2mmi(ev, mslist, metadata):
     return
 
 if __name__ == '__main__':
-    evid = sys.argv[1]
+    ###
+    ### Input parameters ###
+    ###
+    evid = sys.argv[1] # GeoNet event ID
+    ###
+    ### Input parameters ###
+    ###
+
     msdir = os.path.join(evid, '_'.join([evid, 'ms']))
     invfile = f'{evid}_inventory.xml'
 

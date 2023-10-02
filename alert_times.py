@@ -177,7 +177,7 @@ def rdSites(fname):
         stns[stn.split()[0]] = [sdict['latitude'], sdict['longitude']]
     return stns
 
-def rdAlerts(fname, author):
+def rdAlerts(fname, author, mag_w, latency):
     '''
     Create from xml FinDer solutions, EEW alerts in dictionary form:
     tstr: timestring for the alert UTCDateTime
@@ -194,7 +194,10 @@ def rdAlerts(fname, author):
     ret, fdsols, fdevent, lastt = scxml2fdsol(txt)
     alerts = []
     for fd in [f for f in fdsols if f['author'] == author]:
-        alert = {'tstr': fd['vtime'],
+        if fd['mag'] < mag_w:
+            print(f'Ignoring alert as mag below threshold {fd}')
+            continue
+        alert = {'tstr': fd['vtime']+latency,
                 'clat': fd['clat'],
                 'clon': fd['clon'],
                 'alat': fd['fcoords'][0][0],
@@ -260,11 +263,29 @@ def computeAlerts(ev, sites, alerts, adists):
             fout.write(f'{site} {salerts[site]}\n')
     return
 
+def printFirstAlert(ev, alerts):
+    '''
+    Print first alert
+    '''
+    origin_time = ev.preferred_origin().time
+    for a in alerts:
+        print(f'{a["tstr"] - origin_time}: {a}')
+
+    return
+
 if __name__ == '__main__':
-    geonet_evid = sys.argv[1]
-    fd_evid = sys.argv[2]
-    author = sys.argv[3]
-    adistfile = sys.argv[4]
+    ###
+    ### Input parameters ###
+    ###
+    geonet_evid = sys.argv[1] # GeoNet event ID
+    fd_evid = sys.argv[2] # FinDer event ID
+    author = sys.argv[3] # FinDer pipeline author
+    adistfile = sys.argv[4] # Alert distance file
+    mag_w = float(sys.argv[5]) # Alert magnitude threshold
+    latency = float(sys.argv[6]) # Added latency for alerts (judgement)
+    ###
+    ### Input parameters ###
+    ###
 
     alertfile = os.path.join(geonet_evid, f'{fd_evid}.xml')
     if not os.path.isfile(alertfile):
@@ -274,6 +295,7 @@ if __name__ == '__main__':
     client = utils.getClient()
     ev = utils.getEvent(client, geonet_evid)
     adists = rdAlertDists(adistfile)
-    alerts = rdAlerts(alertfile, author)
+    alerts = rdAlerts(alertfile, author, mag_w, latency)
     sites = rdSites(os.path.join(geonet_evid, f'{geonet_evid}_inventory.xml'))
+    printFirstAlert(ev, alerts)
     computeAlerts(ev, sites, alerts, adists)

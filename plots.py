@@ -21,7 +21,6 @@ def setBasemap(bounds = None):
     tiler = Stamen('terrain-background')
     proj = tiler.crs
     fig = Figure(figsize=(8,8))
-#    fig = Figure()
     ax = fig.add_subplot(111, projection = proj)
     if bounds == None:
         bounds = [166.0, 179.0, -47.5, -34.0]
@@ -64,7 +63,7 @@ def plotObsMaps(evid, obs, zoom=False):
     plt.close()
     return
 
-def plotMaps(evid, mmi_tw, alert_cats, alerts, obs, zoom=False):
+def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=False):
     '''
     Plot alert maps
     '''
@@ -88,7 +87,7 @@ def plotMaps(evid, mmi_tw, alert_cats, alerts, obs, zoom=False):
         else:
             fig, ax, proj = setBasemap()
         ax.add_feature(cartopy.feature.OCEAN, zorder=2, facecolor='white', edgecolor='grey', lw=0.5)
-        ax.set_title(f'MMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+        ax.set_title(f'Latency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
         cb = ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPT']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPT']], 
                 c=[obs[x][mmi_tw]-alerts[x][mmi_a] for x in alert_cats[mmi_a]['TPT']], 
@@ -119,7 +118,7 @@ def plotMaps(evid, mmi_tw, alert_cats, alerts, obs, zoom=False):
     plt.close()
     return
 
-def plotScatter(evid, mmi_tw, alert_cats, alerts, obs):
+def plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     '''
     Plot scatter plots
     '''
@@ -151,7 +150,7 @@ def plotScatter(evid, mmi_tw, alert_cats, alerts, obs):
                 cmap=win, label='TP timely', edgecolor='k', lw=0.5)
         cbar = fig.colorbar(cb, ax=ax)
         cbar.set_label('warning time (s)')
-        ax.set_title(f'Maximum predicted MMI\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+        ax.set_title(f'Maximum predicted MMI\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
         ax.set_xlabel('Observed MMI')
         ax.set_ylabel('Predicted MMI')
         ax.grid()
@@ -160,7 +159,7 @@ def plotScatter(evid, mmi_tw, alert_cats, alerts, obs):
     plt.close()
     return
 
-def plotCDF(evid, mmi_tw, alert_cats, alerts, obs):
+def plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     '''
     Plot CDF
     '''
@@ -188,13 +187,15 @@ def plotCDF(evid, mmi_tw, alert_cats, alerts, obs):
             bEmpty = False
             data = [obs[s][mmi_tw]-alerts[s][mmi_a] if obs[s][mmi_tw] is not None else (alerts[s]['dist']/3.5)-alerts[s][mmi_a] for s in allstns]
             count, bins_count = histogram(data, bins=arange(wtmin, wtmax+wtstep/2., wtstep))
+            if sum(count) == 0:
+                    continue
             count = flip(count)
             pdf = count / sum(count)
             cdf = cumsum(pdf)
             ax.plot(flip(bins_count[1:]), cdf, lw=3, c=scalarMap.to_rgba(mmi), label=f'n={len(allstns)}')
         if bEmpty:
             continue
-        ax.set_title(f'Warning time to MMI_tw or S-wave\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+        ax.set_title(f'Warning time to MMI_tw or S-wave\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
         ax.set_xlabel('Warning time (s)')
         ax.set_ylabel('Empirical CDF')
         ax.set_xscale('log')
@@ -280,8 +281,16 @@ def sortCategories(evid, obs, alerts, mmi_tw = 5.0):
     return alert_cats
 
 if __name__ == '__main__':
-    evid = sys.argv[1]
-    mmi_tw = float(sys.argv[2])
+    ###
+    ### Input parameters ###
+    ###
+    evid = sys.argv[1] # GeoNet event ID
+    mmi_tw = float(sys.argv[2]) # Target MMI to provide warning for, onset of damage
+    mag_w = float(sys.argv[3]) # Magnitude to issue warnings for
+    latency = float(sys.argv[4]) # Delivery latency
+    ###
+    ### Input parameters ###
+    ###
 
     ofname = os.path.join(evid, 'exceedance_times.tbl')
     if not os.path.isfile(ofname):
@@ -298,7 +307,7 @@ if __name__ == '__main__':
     plotObsMaps(evid, obs, zoom=True)
     alerts = rdAlertTbl(afname)
     alert_cats = sortCategories(evid, obs, alerts, mmi_tw)
-    plotMaps(evid, mmi_tw, alert_cats, alerts, obs)
-    plotMaps(evid, mmi_tw, alert_cats, alerts, obs, zoom=True)
-    plotScatter(evid, mmi_tw, alert_cats, alerts, obs)
-    plotCDF(evid, mmi_tw, alert_cats, alerts, obs)
+    plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs)
+    plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=True)
+    plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
+    plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
