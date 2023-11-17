@@ -53,6 +53,8 @@ def ms2mmi(ev, mslist, metadata):
                 ind = nonzero(mmi > m)
                 if len(ind[0]) > 0: 
                     etime = tr.stats.starttime + (tr.stats.delta * ind[0][0]) - origin_time
+                    if etime < 0:
+                        print(tr.stats, etime)
                 else:
                     etime = None
                 exceedance_times[stub][m] = etime

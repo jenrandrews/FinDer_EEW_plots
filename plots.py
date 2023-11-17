@@ -164,12 +164,12 @@ def plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     Plot CDF
     '''
     # Warning time bounds
-    wtmin = 0.
-    wtmax = 100.
+    wtmin = -100.
+    wtmax = 300.
     wtstep = 1.
     # MMI bounds
     mmimin = 2.
-    mmimax = 9.
+    mmimax = 10.
     mmistep = 1.
     # Colours
     cmap = plt.get_cmap('jet')
@@ -186,21 +186,24 @@ def plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
                 continue
             bEmpty = False
             data = [obs[s][mmi_tw]-alerts[s][mmi_a] if obs[s][mmi_tw] is not None else (alerts[s]['dist']/3.5)-alerts[s][mmi_a] for s in allstns]
+            data.extend([-1. for s in alert_cats[mmi_a]['TPU'] if obs[s]['max'] >= mmi and obs[s]['max'] < mmi + mmistep])
+            data.extend([-1. for s in alert_cats[mmi_a]['FN'] if obs[s]['max'] >= mmi and obs[s]['max'] < mmi + mmistep])
             count, bins_count = histogram(data, bins=arange(wtmin, wtmax+wtstep/2., wtstep))
             if sum(count) == 0:
                     continue
             count = flip(count)
             pdf = count / sum(count)
             cdf = cumsum(pdf)
-            ax.plot(flip(bins_count[1:]), cdf, lw=3, c=scalarMap.to_rgba(mmi), label=f'n={len(allstns)}')
+            ax.plot(flip(bins_count[1:]), cdf, lw=3, c=scalarMap.to_rgba(mmi), label=f'n={len(data)}')
         if bEmpty:
             continue
         ax.set_title(f'Warning time to MMI_tw or S-wave\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
         ax.set_xlabel('Warning time (s)')
         ax.set_ylabel('Empirical CDF')
-        ax.set_xscale('log')
         ax.set_ylim(0., 1.)
+#        ax.set_xlim(100., 1.)
         ax.set_xlim(wtmax, wtmin+wtstep)
+        ax.set_xscale('log')
         ax.grid(which='both', ls=':')
         ax.yaxis.tick_right()
         fig.legend(loc='upper right')
