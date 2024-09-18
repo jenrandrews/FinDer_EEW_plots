@@ -7,7 +7,9 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import cartopy
 import cartopy.crs as ccrs
-from cartopy.io.img_tiles import Stamen
+from cartopy.io.img_tiles import GoogleTiles
+
+bTitles = False
 
 def setBasemap(bounds = None):
     '''
@@ -18,9 +20,9 @@ def setBasemap(bounds = None):
     Returns:
         fig, axes, proj: figure, axis and projection 
     '''
-    tiler = Stamen('terrain-background')
+    tiler = GoogleTiles(style='satellite')
     proj = tiler.crs
-    fig = Figure(figsize=(8,8))
+    fig = Figure(figsize=(5,5))
     ax = fig.add_subplot(111, projection = proj)
     if bounds == None:
         bounds = [166.0, 179.0, -47.5, -34.0]
@@ -43,13 +45,17 @@ def plotObsMaps(evid, obs, zoom=False):
         ev = utils.getEvent(client, evid)
         evlat = ev.preferred_origin().latitude
         evlon = ev.preferred_origin().longitude
+        # Prevent longitude wrap around
+        if evlon > 179.:
+            evlon = 178.
         evbounds = [evlon-1., evlon+1., evlat-1., evlat+1.]
     if zoom:
         fig, ax, proj = setBasemap(bounds=evbounds)
     else:
         fig, ax, proj = setBasemap()
     ax.add_feature(cartopy.feature.OCEAN, zorder=2, facecolor='white', edgecolor='grey', lw=0.5)
-    ax.set_title(f'Observed MMI')
+    if bTitles:
+        ax.set_title(f'Observed MMI')
     cb = ax.scatter([obs[x]['location']['lon'] for x in obs], 
             [obs[x]['location']['lat'] for x in obs], 
             c=[obs[x]['max'] for x in obs], 
@@ -74,6 +80,8 @@ def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=False):
         ev = utils.getEvent(client, evid)
         evlat = ev.preferred_origin().latitude
         evlon = ev.preferred_origin().longitude
+        if evlon > 179.:
+            evlon = 178.
         evbounds = [evlon-1., evlon+1., evlat-1., evlat+1.]
 
     # Plot categories map
@@ -87,7 +95,8 @@ def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=False):
         else:
             fig, ax, proj = setBasemap()
         ax.add_feature(cartopy.feature.OCEAN, zorder=2, facecolor='white', edgecolor='grey', lw=0.5)
-        ax.set_title(f'Latency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+        if bTitles:
+            ax.set_title(f'Latency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
         cb = ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPT']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPT']], 
                 c=[obs[x][mmi_tw]-alerts[x][mmi_a] for x in alert_cats[mmi_a]['TPT']], 
@@ -128,7 +137,7 @@ def plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     win.set_bad('b')
     cols = {'TN': 'white', 'FN': 'red', 'FP': 'orange'}
     for mmi_a in alert_cats:
-        fig, ax = plt.subplots(1, 1, figsize=(10,8))
+        fig, ax = plt.subplots(1, 1, figsize=(5,5))
         ax.axvline(mmi_a, c='r', lw=2.)
         ax.axhline(mmi_a, c='r', lw=2.)
         ax.plot([2,9], [2,9], c='grey', lw=0.5)
@@ -148,13 +157,14 @@ def plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
                 [max(alerts[s]['pred']) for s in alert_cats[mmi_a]['TPT']],
                 c=[obs[s][mmi_tw]-alerts[s][mmi_a] for s in alert_cats[mmi_a]['TPT']], 
                 cmap=win, label='TP timely', edgecolor='k', lw=0.5)
-        cbar = fig.colorbar(cb, ax=ax)
-        cbar.set_label('warning time (s)')
-        ax.set_title(f'Maximum predicted MMI\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+        if bTitles:
+            cbar = fig.colorbar(cb, ax=ax)
+            cbar.set_label('warning time (s)')
+            ax.set_title(f'Maximum predicted MMI\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+            fig.legend(loc='upper left')
         ax.set_xlabel('Observed MMI')
         ax.set_ylabel('Predicted MMI')
         ax.grid()
-        fig.legend(loc='upper left')
         fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_scatter.png'))
     plt.close()
     return
@@ -177,7 +187,8 @@ def plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     scalarMap = cm.ScalarMappable(norm=norm, cmap=cmap)
     for mmi_a in alert_cats:
         plt.clf()
-        fig, ax = plt.subplots(1, 1, figsize=(10,8))
+#        fig, ax = plt.subplots(1, 1, figsize=(10,8))
+        fig, ax = plt.subplots(1, 1, figsize=(5,5))
         bEmpty = True
         for mmi in arange(mmimin, mmimax, mmistep):
             allstns = [s for s in alert_cats[mmi_a]['TPT'] if obs[s]['max'] >= mmi and obs[s]['max'] < mmi + mmistep]
@@ -191,22 +202,24 @@ def plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
             count, bins_count = histogram(data, bins=arange(wtmin, wtmax+wtstep/2., wtstep))
             if sum(count) == 0:
                     continue
+            #print(mmi_a, mmi, count, bins_count)
             count = flip(count)
             pdf = count / sum(count)
             cdf = cumsum(pdf)
             ax.plot(flip(bins_count[1:]), cdf, lw=3, c=scalarMap.to_rgba(mmi), label=f'n={len(data)}')
         if bEmpty:
             continue
-        ax.set_title(f'Warning time to MMI_tw or S-wave\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+        if bTitles:
+            ax.set_title(f'Warning time to MMI_tw or S-wave\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+            fig.legend(loc='upper right')
         ax.set_xlabel('Warning time (s)')
         ax.set_ylabel('Empirical CDF')
         ax.set_ylim(0., 1.)
-#        ax.set_xlim(100., 1.)
-        ax.set_xlim(wtmax, wtmin+wtstep)
+        ax.set_xlim(100., 1.)
+        #ax.set_xlim(wtmax, wtmin+wtstep)
         ax.set_xscale('log')
         ax.grid(which='both', ls=':')
-        ax.yaxis.tick_right()
-        fig.legend(loc='upper right')
+        ax.yaxis.tick_left()
         cbar = fig.colorbar(scalarMap, ax=ax)
         cbar.set_label('Maximum observed MMI')
         fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_cdf.png'))
@@ -294,6 +307,7 @@ if __name__ == '__main__':
     ###
     ### Input parameters ###
     ###
+    print(f'{evid} {mmi_tw} {mag_w} {latency}')
 
     ofname = os.path.join(evid, 'exceedance_times.tbl')
     if not os.path.isfile(ofname):

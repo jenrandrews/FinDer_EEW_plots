@@ -292,10 +292,18 @@ if __name__ == '__main__':
         print(f'Error missing FinDer event with id {fd_evid}')
         exit()
 
-    client = utils.getClient()
-    ev = utils.getEvent(client, geonet_evid)
-    adists = rdAlertDists(adistfile)
+    evfile = os.path.join(geonet_evid, f'{geonet_evid}.xml')
+    if not os.path.isfile(evfile):
+        client = utils.getClient()
+        ev = utils.getEvent(client, geonet_evid)
+        if ev is None:
+            print(f'Error retrieving event with id {geonet_evid}')
+            exit()
+        ev.write(evfile, format='QUAKEML')
+    ev = ob.read_events(evfile, format='QUAKEML')[0]
+
     alerts = rdAlerts(alertfile, author, mag_w, latency)
     sites = rdSites(os.path.join(geonet_evid, f'{geonet_evid}_inventory.xml'))
     printFirstAlert(ev, alerts)
+    adists = rdAlertDists(adistfile)
     computeAlerts(ev, sites, alerts, adists)
