@@ -200,6 +200,8 @@ def rdAlerts(fname, author, mag_w, latency):
         alert = {'tstr': fd['vtime']+latency,
                 'clat': fd['clat'],
                 'clon': fd['clon'],
+                'elat': fd['elat'],
+                'elon': fd['elon'],
                 'alat': fd['fcoords'][0][0],
                 'alon': fd['fcoords'][0][1],
                 'zlat': fd['fcoords'][-1][0],
@@ -258,7 +260,7 @@ def computeAlerts(ev, sites, alerts, adists):
                     flip(log10(array([adists[alert['mag']][m] for m in adists[alert['mag']]]))),
                     flip(array([m for m in adists[alert['mag']]])))
             salerts[site]['pred'].append(predmmi)
-    with open(os.path.join(evid, 'alert_times.tbl'), 'w') as fout:
+    with open(os.path.join(evid, f'alert_times_{mag_w:.1f}_{latency:.0f}.tbl'), 'w') as fout:
         for site in sorted(salerts):
             fout.write(f'{site} {salerts[site]}\n')
     return
@@ -270,6 +272,7 @@ def printFirstAlert(ev, alerts):
     origin_time = ev.preferred_origin().time
     for a in alerts:
         print(f'{a["tstr"] - origin_time}: {a}')
+        #break
 
     return
 
@@ -304,6 +307,6 @@ if __name__ == '__main__':
 
     alerts = rdAlerts(alertfile, author, mag_w, latency)
     sites = rdSites(os.path.join(geonet_evid, f'{geonet_evid}_inventory.xml'))
-    printFirstAlert(ev, alerts)
+    #printFirstAlert(ev, alerts)
     adists = rdAlertDists(adistfile)
     computeAlerts(ev, sites, alerts, adists)

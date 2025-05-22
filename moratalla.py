@@ -72,12 +72,19 @@ def mmi2gm(mmi):
     return gm
 
 def mmi2gmTBL():
+    '''
+    Create a dictionary with MMI as key and value as a dictionary of 'pga' (cm/s/s) and 'pgv' (cm/s)
+    '''
     gm = {}
     for mmi in arange(2.5, 9.0, 0.5):
         gm[mmi] = mmi2gm(mmi)
     return gm
 
 if __name__ == '__main__':
+
+    #for mmi in [3.5, 5.0]:
+    #    print(mmi, mmi2gm(mmi))
+
     from numpy import arange
     pga = arange(0.2, 2.7, 0.1)
     pgv = arange(-1., 1.7, 0.1)

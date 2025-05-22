@@ -36,7 +36,7 @@ def setBasemap(bounds = None):
 
 def plotObsMaps(evid, obs, zoom=False):
     '''
-    Plot observation maps
+    Plot observation maps, observed MMI
     '''
     if zoom:
         # Zoom map to event
@@ -63,9 +63,9 @@ def plotObsMaps(evid, obs, zoom=False):
     cbar = fig.colorbar(cb, ax=ax)
     cbar.set_label('observed MMI')
     if zoom:
-        fig.savefig(os.path.join(evid, f'{evid}_map-obs-zoom.png'))
+        fig.savefig(os.path.join(evid, f'{evid}_map-obs-zoom.png'), bbox_inches='tight')
     else:
-        fig.savefig(os.path.join(evid, f'{evid}_map-obs.png'))
+        fig.savefig(os.path.join(evid, f'{evid}_map-obs.png'), bbox_inches='tight')
     plt.close()
     return
 
@@ -89,7 +89,15 @@ def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=False):
     win.set_over('b')
     win.set_under('b')
     win.set_bad('b')
+    tmin = 0.
+    if evid == '2016p858000':
+        tmax = 120.
+    elif evid == '3366146':
+        tmax = 35.
+    else:
+        tmax = 35.
     for mmi_a in alert_cats:
+        plt.clf()
         if zoom:
             fig, ax, proj = setBasemap(bounds=evbounds)
         else:
@@ -100,36 +108,37 @@ def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=False):
         cb = ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPT']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPT']], 
                 c=[obs[x][mmi_tw]-alerts[x][mmi_a] for x in alert_cats[mmi_a]['TPT']], 
-                transform=proj, cmap=win, lw=0.5, edgecolor='k', zorder=3, label='TP timely')
+                transform=proj, cmap=win, lw=0.5, edgecolor='k', zorder=3, label='TP timely', s=15,
+                vmin = tmin, vmax = tmax)
         ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPL']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPL']], 
-                transform=proj, c='yellow', lw=0.5, edgecolor='k', zorder=3, label='TP timely < MMI_tw')
+                transform=proj, c='yellow', lw=0.5, edgecolor='k', zorder=3, label='TP timely < MMI_tw', s=15)
         ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPU']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPU']], 
-                transform=proj, c='black', lw=0.5, edgecolor='k', zorder=3, label='TP untimely')
+                transform=proj, c='black', lw=0.5, edgecolor='k', zorder=3, label='TP untimely', s=15)
         ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['FP']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['FP']], 
-                transform=proj, c='orange', lw=0.5, edgecolor='k', zorder=3, label='FP')
+                transform=proj, c='orange', lw=0.5, edgecolor='k', zorder=3, label='FP', s=15)
         ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['FN']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['FN']], 
-                transform=proj, c='red', edgecolor='k', zorder=3, label='FN')
+                transform=proj, c='red', lw=0.5, edgecolor='k', zorder=3, label='FN', s=15)
         ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TN']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TN']], 
-                transform=proj, c='white', lw=0.5, edgecolor='k', zorder=3, label='TN')
+                transform=proj, c='white', lw=0.5, edgecolor='k', zorder=3, label='TN', s=15)
         handles, labels = ax.get_legend_handles_labels()
         fig.legend(loc='upper left')
         cbar = fig.colorbar(cb, ax=ax)
         cbar.set_label('warning time (s)')
         if zoom:
-            fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map-zoom.png'))
+            fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map-zoom.png'), bbox_inches='tight')
         else:
-            fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map.png'))
+            fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map.png'), bbox_inches='tight')
     plt.close()
     return
 
-def plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
+def plotScatterMMI(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     '''
-    Plot scatter plots
+    Plot scatter plots, observed vs predicted MMI
     '''
     win = cm.winter
     win.set_over('b')
@@ -137,6 +146,7 @@ def plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     win.set_bad('b')
     cols = {'TN': 'white', 'FN': 'red', 'FP': 'orange'}
     for mmi_a in alert_cats:
+        plt.clf()
         fig, ax = plt.subplots(1, 1, figsize=(5,5))
         ax.axvline(mmi_a, c='r', lw=2.)
         ax.axhline(mmi_a, c='r', lw=2.)
@@ -161,7 +171,7 @@ def plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
             cbar = fig.colorbar(cb, ax=ax)
             cbar.set_label('warning time (s)')
             ax.set_title(f'Maximum predicted MMI\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
-            fig.legend(loc='upper left')
+            #fig.legend(loc='upper left')
         ax.set_xlabel('Observed MMI')
         ax.set_ylabel('Predicted MMI')
         ax.grid()
@@ -169,9 +179,61 @@ def plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     plt.close()
     return
 
-def plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
+def plotScatterWarningTimeDist(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     '''
-    Plot CDF
+    Scatter plot of warning time against distance
+    '''
+    # MMI bounds
+    mmimin = 2.
+    mmimax = 10.
+    cmap = plt.get_cmap('jet')
+    norm = mpl.colors.Normalize(vmin=mmimin, vmax=mmimax)
+    scalarMap = cm.ScalarMappable(norm=norm, cmap=cmap)
+    cols = {'TN': 'white', 'FN': 'red', 'FP': 'orange'}
+    for mmi_a in alert_cats:
+        plt.clf()
+        fig, ax = plt.subplots(1, 1, figsize=(8,5))
+        for cat in ['TN', 'FP', 'FN']:
+            ax.scatter([alerts[s]['dist'] for s in alert_cats[mmi_a][cat]],
+                [0. for s in alert_cats[mmi_a][cat]], 
+                c=cols[cat], s=100., label=cat, edgecolor='k', lw=0.5)
+            ax.scatter([alerts[s]['dist'] for s in alert_cats[mmi_a][cat]],
+                [0. for s in alert_cats[mmi_a][cat]], 
+                c=[obs[s]['max'] for s in alert_cats[mmi_a][cat]], 
+                cmap=cmap, vmin=mmimin, vmax=mmimax, label=cat, lw=0.5)
+        ax.scatter([alerts[s]['dist'] for s in alert_cats[mmi_a]['TPL']], 
+                [(obs[s]['location']['epidist']/3.5)-alerts[s][mmi_a] for s in alert_cats[mmi_a]['TPL']], 
+                c='yellow', s=100., label='TP timely < MMI_tw', edgecolor='k', lw=0.5)
+        ax.scatter([alerts[s]['dist'] for s in alert_cats[mmi_a]['TPL']], 
+                [(obs[s]['location']['epidist']/3.5)-alerts[s][mmi_a] for s in alert_cats[mmi_a]['TPL']], 
+                c=[obs[s]['max'] for s in alert_cats[mmi_a]['TPL']], 
+                cmap=cmap, vmin=mmimin, vmax=mmimax, label='TP timely < MMI_tw', lw=0.5)
+        ax.scatter([alerts[s]['dist'] for s in alert_cats[mmi_a]['TPU']], 
+                [obs[s][mmi_tw]-alerts[s][mmi_a] for s in alert_cats[mmi_a]['TPU']], 
+                c='k', s=100., label='TP untimely', edgecolor='k', lw=0.5)
+        ax.scatter([alerts[s]['dist'] for s in alert_cats[mmi_a]['TPU']], 
+                [obs[s][mmi_tw]-alerts[s][mmi_a] for s in alert_cats[mmi_a]['TPU']], 
+                c=[obs[s]['max'] for s in alert_cats[mmi_a]['TPU']], 
+                cmap=cmap, vmin=mmimin, vmax=mmimax, label='TP untimely', lw=0.5)
+        cb = ax.scatter([alerts[s]['dist'] for s in alert_cats[mmi_a]['TPT']], 
+                [obs[s][mmi_tw]-alerts[s][mmi_a] for s in alert_cats[mmi_a]['TPT']], 
+                c=[obs[s]['max'] for s in alert_cats[mmi_a]['TPT']], 
+                cmap=cmap, vmin=mmimin, vmax=mmimax, label='TP timely', edgecolor='k', lw=0.5)
+        if bTitles:
+            cbar = fig.colorbar(scalarMap, ax=ax)
+            cbar.set_label('Observed MMI')
+            ax.set_title(f'Warning time to MMI_tw or S-wave\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
+        ax.axhline(0.)
+        ax.set_ylabel('warning time (s)')
+        ax.set_xlabel('distance (km)')
+        ax.grid()
+        fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_timedist.png'), bbox_inches='tight')
+    plt.close()
+    return
+
+def plotWarningTimeCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
+    '''
+    Plot CDF of warning times
     '''
     # Warning time bounds
     wtmin = -100.
@@ -220,9 +282,10 @@ def plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
         ax.set_xscale('log')
         ax.grid(which='both', ls=':')
         ax.yaxis.tick_left()
-        cbar = fig.colorbar(scalarMap, ax=ax)
+        dnorm = mpl.colors.BoundaryNorm([1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5], cmap.N)
+        cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=dnorm, cmap=cmap), ticks=range(2,11), ax=ax)
         cbar.set_label('Maximum observed MMI')
-        fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_cdf.png'))
+        fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_cdf.png'), bbox_inches='tight')
     plt.close()
     return
 
@@ -249,7 +312,7 @@ def sortCategories(evid, obs, alerts, mmi_tw = 5.0):
     Sort results into categories: TP, FP, FN, TN. Account for untimely TP and TP with low ground motion
     Plot 
     '''
-    mmi_alerts = sorted(set([mmi for stn in alerts for mmi in alerts[stn] if stn != 'times' and mmi not in ['location', 'dist', 'pred']]))
+    mmi_alerts = sorted(set([mmi for stn in alerts for mmi in alerts[stn] if stn != 'times' and mmi not in ['location', 'dist', 'pred', 'epidist']]))
     alert_cats = {}
     for mmi_a in mmi_alerts:
         if mmi_a == 'pred':
@@ -314,17 +377,21 @@ if __name__ == '__main__':
         print(f'Cannot create plots as file {ofname} is missing')
         exit()
 
-    afname = os.path.join(evid, 'alert_times.tbl')
+    afname = os.path.join(evid, f'alert_times_{mag_w:.1f}_{latency:.0f}.tbl')
     if not os.path.isfile(afname):
         print(f'Cannot create plots as file {afname} is missing')
         exit()
 
     obs = rdExceedanceTbl(ofname)
-    plotObsMaps(evid, obs)
-    plotObsMaps(evid, obs, zoom=True)
+    if not os.path.isfile(os.path.join(evid, f'{evid}_map-obs.png')):
+        plotObsMaps(evid, obs)
+    if not os.path.isfile(os.path.join(evid, f'{evid}_map-obs-zoom.png')):
+        plotObsMaps(evid, obs, zoom=True)
     alerts = rdAlertTbl(afname)
     alert_cats = sortCategories(evid, obs, alerts, mmi_tw)
     plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs)
     plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=True)
-    plotScatter(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
-    plotCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
+    plotScatterMMI(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
+    plotWarningTimeCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
+    plotScatterWarningTimeDist(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
+

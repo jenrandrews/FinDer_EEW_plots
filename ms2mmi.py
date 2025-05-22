@@ -44,6 +44,8 @@ def ms2mmi(ev, mslist, metadata):
     for ms in sorted(mslist):
         st = ob.read(ms)
         for tr in st:
+            if tr.stats.location not in ['10', '20']: # This is a hack for New Zealand
+                continue
             stub = tr.get_id()
             if stub not in exceedance_times:
                 try:
@@ -55,7 +57,7 @@ def ms2mmi(ev, mslist, metadata):
                 if not doTimeCheck(tr, origin_time, dist):
                     continue
                 exceedance_times[stub] = {}
-                exceedance_times[stub]['location'] = {'lat': sdict['latitude'], 'lon': sdict['longitude']}
+                exceedance_times[stub]['location'] = {'lat': sdict['latitude'], 'lon': sdict['longitude'], 'epidist': dist}
             inv = metadata.select(network=tr.stats.network, 
                                   station=tr.stats.station,
                                   location=tr.stats.location, 
@@ -106,8 +108,8 @@ def ms2mmi(ev, mslist, metadata):
                 ind = nonzero(mmi > m)
                 if len(ind[0]) > 0: 
                     etime = tr.stats.starttime + (tr.stats.delta * ind[0][0]) - origin_time
-                    if etime < 0:
-                        print(tr.stats, etime)
+                    #if etime < 0:
+                    #    print(tr.stats, etime)
                 else:
                     etime = None
                 if m in exceedance_times[stub]:
@@ -155,6 +157,7 @@ if __name__ == '__main__':
     ###
 
     msdir = os.path.join(evid, f'{evid}_ms')
+    msfile = os.path.join(evid, f'{evid}.ms')
     invfile = f'{evid}_inventory.xml'
     evfile = f'{evid}.xml'
 
@@ -171,18 +174,24 @@ if __name__ == '__main__':
     invfile = os.path.join(evid, invfile)
     if not os.path.isfile(invfile):
         print(f'inventory file {invfile} does not exist!')
+        exit()
         invfile = utils.downloadInv(client, ev)
         if invfile is None:
             print(f'Error retrieving inventory file {invfile}')
             exit()
     metadata = ob.read_inventory(invfile)
 
-    if not os.path.isdir(msdir):
-        print(f'miniseed directory {msdir} does not exist!')
+    if not os.path.isdir(msdir) and not os.path.isfile(msfile):
+        print(f'miniseed directory {msdir} and file {msfile} does not exist!')
         wffiles = utils.downloadWF(client, metadata, ev)
         if wffiles is None:
             print(f'Error retrieving miniseed files')
             exit()
 
-    mslist = [os.path.join(msdir, ms) for ms in os.listdir(msdir)]
+    if os.path.isdir(msdir):
+        mslist = [os.path.join(msdir, ms) for ms in os.listdir(msdir)]
+    else:
+        mslist = [msfile]
+
     ms2mmi(ev, mslist, metadata)
+

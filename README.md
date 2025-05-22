@@ -1,6 +1,6 @@
 # FinDer_EEW_plots
-Create EEW performance plots for FinDer NZ. The performance metrics are computed following Meier and
-assume a radial alert for MMI thresholds.
+Create EEW performance plots for FinDer NZ. The performance metrics are computed following Meier
+(2017) and assume a radial alert (around the FinDer line source) for MMI thresholds.
 
 ## Running
 The run.sh script is the entry point and should be edited to give:
