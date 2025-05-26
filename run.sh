@@ -157,8 +157,8 @@ read -ra fd_evids <<< "$fd_evid"
 
 for ((idx = 0; idx < ${#evids[@]}; idx++)); do
   for mag_w in 4.5 5.5; do
-#    for latency in 0 5 10; do
-    for latency in 4; do
+    for latency in 0 5 10; do
+#    for latency in 4; do
       evid=${evids[idx]}
       fd_evid=${fd_evids[idx]}
       echo $idx $evid $fd_evid
@@ -186,7 +186,7 @@ for ((idx = 0; idx < ${#evids[@]}; idx++)); do
 
       # Plotting
       if true; then
-        python plots.py $evid $mmi_tw $mag_w $latency
+        python plots.py $evid $mmi_tw $mag_w $latency $fd_evid
         plotdir="plots_latency-${latency}_mag-${mag_w}_mmitw-${mmi_tw}"
         if [ ! -d ${evid}/${plotdir} ]; then
           mkdir ${evid}/${plotdir}

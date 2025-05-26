@@ -1,15 +1,25 @@
 import sys
 import os
+from obspy import read_events
 from numpy import arange, histogram, cumsum, flip
 import matplotlib as mpl
 from matplotlib.pyplot import cm
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import cartopy
 import cartopy.crs as ccrs
-from cartopy.io.img_tiles import GoogleTiles
+import alert_times as at
 
 bTitles = False
+bInsets = True
+
+def addBasemap(ax, bounds = None):
+    if bounds == None:
+        bounds = [166.0, 179.0, -47.5, -34.0]
+    ax.set_extent(bounds, crs=ccrs.PlateCarree())
+    ax.add_feature(cartopy.feature.OCEAN, zorder=2, facecolor='white', edgecolor='grey', lw=0.5)
+    return
 
 def setBasemap(bounds = None):
     '''
@@ -20,19 +30,14 @@ def setBasemap(bounds = None):
     Returns:
         fig, axes, proj: figure, axis and projection 
     '''
-    tiler = GoogleTiles(style='satellite')
-    proj = tiler.crs
-    fig = Figure(figsize=(5,5))
-    ax = fig.add_subplot(111, projection = proj)
-    if bounds == None:
-        bounds = [166.0, 179.0, -47.5, -34.0]
-    ax.set_extent(bounds, crs=ccrs.PlateCarree())
-    #ax.add_image(tiler, 8, alpha=0.7, zorder=0.)
-    # ax.coastlines(resolution='50m') # requires download
+    fig, ax = plt.subplots(figsize=(5,5),
+                           subplot_kw={
+                               "projection": ccrs.Mercator()})
+    addBasemap(ax, bounds)
     gl = ax.gridlines(draw_labels=True, linestyle='--')
     gl.top_labels = False
     gl.right_labels = False
-    return fig, ax, ccrs.PlateCarree()
+    return fig, ax, ccrs.PlateCarree(), ccrs.Mercator()
 
 def plotObsMaps(evid, obs, zoom=False):
     '''
@@ -50,10 +55,9 @@ def plotObsMaps(evid, obs, zoom=False):
             evlon = 178.
         evbounds = [evlon-1., evlon+1., evlat-1., evlat+1.]
     if zoom:
-        fig, ax, proj = setBasemap(bounds=evbounds)
+        fig, ax, proj, map_proj = setBasemap(bounds=evbounds)
     else:
-        fig, ax, proj = setBasemap()
-    ax.add_feature(cartopy.feature.OCEAN, zorder=2, facecolor='white', edgecolor='grey', lw=0.5)
+        fig, ax, proj, map_proj = setBasemap()
     if bTitles:
         ax.set_title(f'Observed MMI')
     cb = ax.scatter([obs[x]['location']['lon'] for x in obs], 
@@ -69,7 +73,7 @@ def plotObsMaps(evid, obs, zoom=False):
     plt.close()
     return
 
-def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=False):
+def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, fdsol, ev, zoom=False):
     '''
     Plot alert maps
     '''
@@ -86,30 +90,33 @@ def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=False):
 
     # Plot categories map
     win = cm.winter
-    win.set_over('b')
+    win.set_over('cyan')
     win.set_under('b')
     win.set_bad('b')
-    tmin = 0.
-    if evid == '2016p858000':
-        tmax = 120.
-    elif evid == '3366146':
-        tmax = 35.
-    else:
-        tmax = 35.
+    tmin = 1.
+    tmax = 40.
+#    if evid == '2016p858000':
+#        tmax = 120.
+#    elif evid == '3366146':
+#        tmax = 35.
+#    else:
+#        tmax = 35.
     for mmi_a in alert_cats:
         plt.clf()
         if zoom:
-            fig, ax, proj = setBasemap(bounds=evbounds)
+            fig, ax, proj, map_proj = setBasemap(bounds=evbounds)
         else:
-            fig, ax, proj = setBasemap()
-        ax.add_feature(cartopy.feature.OCEAN, zorder=2, facecolor='white', edgecolor='grey', lw=0.5)
+            nzbounds = [166.0, 179.0, -47.5, -34.0]
+            #nzbounds = [166.0, 174.5, -47.5, -39.0] # SI
+            fig, ax, proj, map_proj = setBasemap(bounds=nzbounds)
         if bTitles:
             ax.set_title(f'Latency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
         cb = ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPT']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPT']], 
                 c=[obs[x][mmi_tw]-alerts[x][mmi_a] for x in alert_cats[mmi_a]['TPT']], 
-                transform=proj, cmap=win, lw=0.5, edgecolor='k', zorder=3, label='TP timely', s=15,
-                vmin = tmin, vmax = tmax)
+                transform=proj, cmap=win, lw=0.3, edgecolor='k', zorder=3, label='TP timely', s=15,
+                norm = mpl.colors.LogNorm(vmin = tmin, vmax = tmax))
+#                vmin = tmin, vmax = tmax)
         ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPL']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPL']], 
                 transform=proj, c='yellow', lw=0.5, edgecolor='k', zorder=3, label='TP timely < MMI_tw', s=15)
@@ -125,9 +132,51 @@ def plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=False):
         ax.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TN']], 
                 [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TN']], 
                 transform=proj, c='white', lw=0.5, edgecolor='k', zorder=3, label='TN', s=15)
+        if bInsets:
+            alat = fdsol['fcoords'][0][0]
+            alon = fdsol['fcoords'][0][1]
+            zlat = fdsol['fcoords'][-1][0]
+            zlon = fdsol['fcoords'][-1][1]
+            axins = inset_axes(ax, width="30%", height="30%", loc="lower right",
+                               bbox_to_anchor=(0, 0, 1, 1),
+                               bbox_transform=ax.transAxes,
+                               axes_class=cartopy.mpl.geoaxes.GeoAxes,
+                               axes_kwargs=dict(projection=map_proj))
+            inset_extent = [min(alon,zlon)-0.5, max(alon,zlon)+0.5, min(alat,zlat)-0.5, max(alat,zlat)+0.5]
+            addBasemap(axins, inset_extent)
+            axins.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPT']], 
+                    [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPT']], 
+                    c=[obs[x][mmi_tw]-alerts[x][mmi_a] for x in alert_cats[mmi_a]['TPT']], 
+                    transform=proj, cmap=win, lw=0.3, edgecolor='k', zorder=3, s=15,
+                    norm = mpl.colors.LogNorm(vmin = tmin, vmax = tmax))
+            axins.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPL']], 
+                    [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPL']], 
+                    transform=proj, c='yellow', lw=0.5, edgecolor='k', zorder=3, s=15)
+            axins.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TPU']], 
+                    [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TPU']], 
+                    transform=proj, c='black', lw=0.5, edgecolor='k', zorder=3, s=15)
+            axins.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['FP']], 
+                    [alerts[x]['location'][0] for x in alert_cats[mmi_a]['FP']], 
+                    transform=proj, c='orange', lw=0.5, edgecolor='k', zorder=3, s=15)
+            axins.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['FN']], 
+                    [alerts[x]['location'][0] for x in alert_cats[mmi_a]['FN']], 
+                    transform=proj, c='red', lw=0.5, edgecolor='k', zorder=3, s=15)
+            axins.scatter([alerts[x]['location'][1] for x in alert_cats[mmi_a]['TN']], 
+                    [alerts[x]['location'][0] for x in alert_cats[mmi_a]['TN']], 
+                    transform=proj, c='white', lw=0.5, edgecolor='k', zorder=3, s=15)
+            axins.scatter(ev.preferred_origin().longitude, ev.preferred_origin().latitude, 
+                          zorder=5, marker=(5,1), c='r', edgecolor='k', lw=0.5, transform=proj)
+            axins.plot([alon, zlon], [alat, zlat], c='r', zorder=5, transform=proj)
+            inset_indic = ax.indicate_inset_zoom(axins, edgecolor="black", alpha=0.5, lw=0.5, transform=ax.transAxes)
+            # Box around location of inset map on main map
+            x = [inset_extent[0], inset_extent[1], inset_extent[1], inset_extent[0], inset_extent[0]]
+            y = [inset_extent[2], inset_extent[2], inset_extent[3], inset_extent[3], inset_extent[2]]
+            ax.plot(x, y, color='k', lw=0.5, alpha=0.5, transform=proj)
+
         handles, labels = ax.get_legend_handles_labels()
         fig.legend(loc='upper left')
-        cbar = fig.colorbar(cb, ax=ax)
+        cbar = fig.colorbar(cb, ax=ax, extend='max', ticks=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40])
+        cbar.ax.set_yticklabels(['1', '2', '', '', '5', '', '', '', '', '10', '20', '30', '40'])
         cbar.set_label('warning time (s)')
         if zoom:
             fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_map-zoom.png'), bbox_inches='tight')
@@ -141,9 +190,11 @@ def plotScatterMMI(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
     Plot scatter plots, observed vs predicted MMI
     '''
     win = cm.winter
-    win.set_over('b')
+    win.set_over('cyan')
     win.set_under('b')
     win.set_bad('b')
+    tmin = 1.
+    tmax = 40.
     cols = {'TN': 'white', 'FN': 'red', 'FP': 'orange'}
     for mmi_a in alert_cats:
         plt.clf()
@@ -166,9 +217,11 @@ def plotScatterMMI(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
         cb = ax.scatter([obs[s]['max'] for s in alert_cats[mmi_a]['TPT']], 
                 [max(alerts[s]['pred']) for s in alert_cats[mmi_a]['TPT']],
                 c=[obs[s][mmi_tw]-alerts[s][mmi_a] for s in alert_cats[mmi_a]['TPT']], 
-                cmap=win, label='TP timely', edgecolor='k', lw=0.5)
+                cmap=win, label='TP timely', edgecolor='k', lw=0.5,
+                norm = mpl.colors.LogNorm(vmin = tmin, vmax = tmax))
         if bTitles:
-            cbar = fig.colorbar(cb, ax=ax)
+            cbar = fig.colorbar(cb, ax=ax, extend='max', ticks=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40])
+            cbar.ax.set_yticklabels(['1', '2', '', '', '5', '', '', '', '', '10', '20', '30', '40'])
             cbar.set_label('warning time (s)')
             ax.set_title(f'Maximum predicted MMI\nLatency: {latency}s, Mag: {mag_w}\nMMI_tw: {mmi_tw}, MMI_alert: {mmi_a}')
             #fig.legend(loc='upper left')
@@ -282,7 +335,7 @@ def plotWarningTimeCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs):
         ax.set_xscale('log')
         ax.grid(which='both', ls=':')
         ax.yaxis.tick_left()
-        dnorm = mpl.colors.BoundaryNorm([1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5], cmap.N)
+        dnorm = mpl.colors.BoundaryNorm([2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0], cmap.N)
         cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=dnorm, cmap=cmap), ticks=range(2,11), ax=ax)
         cbar.set_label('Maximum observed MMI')
         fig.savefig(os.path.join(evid, f'{evid}_mmi{mmi_a}_cdf.png'), bbox_inches='tight')
@@ -367,6 +420,7 @@ if __name__ == '__main__':
     mmi_tw = float(sys.argv[2]) # Target MMI to provide warning for, onset of damage
     mag_w = float(sys.argv[3]) # Magnitude to issue warnings for
     latency = float(sys.argv[4]) # Delivery latency
+    fd_evid = sys.argv[5] # FinDer event ID
     ###
     ### Input parameters ###
     ###
@@ -389,8 +443,31 @@ if __name__ == '__main__':
         plotObsMaps(evid, obs, zoom=True)
     alerts = rdAlertTbl(afname)
     alert_cats = sortCategories(evid, obs, alerts, mmi_tw)
-    plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs)
-    plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, zoom=True)
+
+    fdsol = None
+    ev = None
+    if bInsets:
+        # FinDer
+        alertfile = os.path.join(evid, f'{fd_evid}.xml')
+        if not os.path.isfile(alertfile):
+            print(f'Error missing FinDer event with id {fd_evid}')
+            bInsets = False
+        with open(alertfile, 'r') as fin:
+            txt = fin.read()
+        ret, fdsols, fdevent, lastt = at.scxml2fdsol(txt)
+        fdsol = sorted([f for f in fdsols if f['author'] == 'scfinder'], key=lambda d: d['vtime'], reverse=True)[0]
+        # Catalog
+        evfile = os.path.join(evid, f'{evid}.xml')
+        if not os.path.isfile(evfile):
+            client = utils.getClient()
+            ev = utils.getEvent(client, evid)
+            if ev is None:
+                print(f'Error retrieving event with id {evid}')
+                exit()
+            ev.write(evfile, format='QUAKEML')
+        ev = read_events(evfile, format='QUAKEML')[0]
+    plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, fdsol, ev)
+    plotMaps(evid, mmi_tw, mag_w, latency, alert_cats, alerts, obs, fdsol, ev, zoom=True)
     plotScatterMMI(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
     plotWarningTimeCDF(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
     plotScatterWarningTimeDist(evid, mmi_tw, mag_w, alert_cats, alerts, obs)
